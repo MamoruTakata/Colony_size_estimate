@@ -1,0 +1,555 @@
+---
+title: "A method for estimating colony size using queen fecundity in termites under field conditions"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+# All analyses were performed using R v4.2.3.
+```
+
+```{r}
+# packages
+install.packages("readxl")
+install.packages("ggplot2")
+install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("lme4")
+install.packages("car")
+
+library(readxl)
+library(ggplot2)
+library(tidyverse)
+library(lme4)
+library(car)
+```
+
+# Mark recapture
+```{r}
+# data loading and processing
+mark <- read_excel("Dataset.xlsx", sheet="mark recapture") %>% 
+  mutate(total_W = no_of_unmarked_wroker + no_of_marked_workers_stayed_in_introduced_log + no_of_marked_workers_dispersed_from_another_log) %>% 
+  as.data.frame(.)
+
+mark_r <- mark %>% 
+  filter(area == "royal_chamber")
+mark_f <- mark %>% 
+  filter(area == "foraging")
+
+# marked workers introduced in royal area
+introduced_in_royal <- mark_r %>% 
+  rename(no_of_marked_workers = no_of_marked_workers_stayed_in_introduced_log) %>% 
+  dplyr::select(colony, period_week, no_of_marked_workers, total_W) %>% 
+  mutate(category = "stayed")
+despersed_to_foraging <- mark_f %>% 
+  rename(no_of_marked_workers = no_of_marked_workers_dispersed_from_another_log) %>% 
+  dplyr::select(colony, period_week, no_of_marked_workers, total_W) %>% 
+  mutate(category = "dispersed")
+introduced_in_royal <- rbind(introduced_in_royal, despersed_to_foraging) %>% 
+   mutate(origin = "introduced_in_royal")
+
+# marked workers introduced in foraging area
+introduced_in_foraging <- mark_f %>% 
+  rename(no_of_marked_workers = no_of_marked_workers_stayed_in_introduced_log) %>% 
+  dplyr::select(colony, period_week, no_of_marked_workers, total_W) %>% 
+  mutate(category = "stayed")
+despersed_to_royal <- mark_r %>% 
+  rename(no_of_marked_workers = no_of_marked_workers_dispersed_from_another_log) %>% 
+  dplyr::select(colony, period_week, no_of_marked_workers, total_W) %>% 
+  mutate(category = "dispersed")
+introduced_in_foraging <- rbind(introduced_in_foraging, despersed_to_royal) %>% 
+   mutate(origin = "introduced_in_foraging")
+
+mark_all <- rbind(introduced_in_royal, introduced_in_foraging)
+```
+
+## * sample size
+```{r}
+summary_mark <- mark %>% 
+  group_by(period_week,colony) %>% 
+  summarize(mean = mean(no_of_unmarked_wroker)) %>% 
+  summarize(number = n())
+summary_mark
+```
+
+## * statistical analysis
+### * introduced in royal and foraging
+#### * effect of test period on distribution of marked workers (all data merged)
+```{r}
+model_all1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category * period_week + (1|colony), family = binomial, mark_all)
+model_all2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + period_week + (1|colony), family = binomial, mark_all)
+model_all3 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + period_week + (1|colony), family = binomial, mark_all)
+
+summary(model_all1)
+anova(model_all1, model_all2, test="Chi")
+```
+
+#### * comparison of distribution of marked workers between areas (all data merged)
+```{r}
+summary(model_all2)
+anova(model_all2, model_all3, test="Chi")
+```
+
+### * comparison of distribution of marked workers between areas
+#### * 2 weeks
+```{r}
+model_2w1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, mark_all %>% filter(period_week=="2"))
+model_2w2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, mark_all %>% filter(period_week=="2"))
+summary(model_2w1)
+anova(model_2w1, model_2w2, test="Chi")
+```
+
+#### * 4 weeks
+```{r}
+model_4w1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, mark_all %>% filter(period_week=="4"))
+model_4w2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, mark_all %>% filter(period_week=="4"))
+summary(model_4w1)
+anova(model_4w1, model_4w2, test="Chi")
+```
+
+
+### * introduced in royal
+#### * effect of test period on distribution of marked workers
+```{r}
+model_r1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category * period_week + (1|colony), family = binomial, introduced_in_royal)
+model_r2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + period_week + (1|colony), family = binomial, introduced_in_royal)
+summary(model_r1)
+anova(model_r1, model_r2, test="Chi")
+```
+
+#### * comparison of distribution of marked workers between areas in 2 weeks group
+```{r}
+model_r2_1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, introduced_in_royal %>% filter(period_week=="2"))
+model_r2_2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, introduced_in_royal %>% filter(period_week=="2"))
+summary(model_r2_1)
+anova(model_r2_1, model_r2_2, test="Chi")
+```
+
+#### * comparison of distribution of marked workers between areas in 4 weeks group
+```{r}
+model_r4_1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, introduced_in_royal %>% filter(period_week=="4"))
+model_r4_2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, introduced_in_royal %>% filter(period_week=="4"))
+summary(model_r4_1)
+anova(model_r4_1, model_r4_2, test="Chi")
+```
+
+### * introduced in foraging
+#### * effect of test period on distribution of marked workers
+```{r}
+model_f1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category * period_week + (1|colony), family = binomial, introduced_in_foraging)
+model_f2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + period_week + (1|colony), family = binomial, introduced_in_foraging)
+summary(model_f1)
+Anova(model_f1)
+anova(model_f1, model_f2, test="Chi")
+```
+
+#### * comparison of distribution of marked workers between areas in 2 weeks group
+```{r}
+model_f2_1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, introduced_in_foraging %>% filter(period_week=="2"))
+model_f2_2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, introduced_in_foraging %>% filter(period_week=="2"))
+summary(model_f2_1)
+anova(model_f2_1, model_f2_2, test="Chi")
+```
+
+#### * comparison of distribution of marked workers between areas in 4 weeks group
+```{r}
+model_f4_1 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ category + (1|colony), family = binomial, introduced_in_foraging %>% filter(period_week=="4"))
+model_f4_2 <- glmer(cbind(no_of_marked_workers, total_W-no_of_marked_workers) ~ 1 + (1|colony), family = binomial, introduced_in_foraging %>% filter(period_week=="4"))
+summary(model_f4_1)
+anova(model_f4_1, model_f4_2, test="Chi")
+```
+
+## * figure
+```{r}
+# distribution of marked workers
+mark_all$category <- factor(mark_all$category, levels=c("stayed","dispersed")) 
+
+Figure_mark_all <-
+ggplot(mark_all,
+       aes(y = no_of_marked_workers/total_W,
+           x = category,
+           ))+
+  geom_boxplot() + 
+  geom_jitter(#group = "group", 
+              color = "black", 
+              height = 0, 
+              width = 0.2, 
+              alpha = 1, 
+              size = 1 
+              ) +
+  facet_wrap(vars(as.factor(period_week)), scales = "free") +
+  scale_y_continuous(breaks=seq(0,1,by=0.005),limits=c(0,0.026),expand=c(0,0)) +
+  labs(y = "marked worker ratio",
+       x = "",
+       title ="") +
+  theme_classic()
+Figure_mark_all
+
+# save figure
+ggsave(file = "Figure distribution of marked workers.pdf", plot = Figure_mark_all, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+
+# Variance in body weight of secondary queen
+```{r}
+# data loading
+variance <- read_excel("Dataset.xlsx", sheet="seasonality in queen weight") %>% 
+  as.data.frame(.)
+
+variance_c <- variance %>% 
+  group_by(colony, month) %>% 
+  summarize(mean_body_weight_of_secondary_queen_mg = mean(body_weight_of_secondary_queen_mg)) %>% 
+  mutate(mean_body_weight_of_secondary_queen_mg = round(mean_body_weight_of_secondary_queen_mg,2))
+```
+
+## * sample size
+```{r}
+summary_variance <- variance %>% 
+  summarize(number = n())
+summary_variance
+
+summary_variance_c <- variance_c %>% 
+  summarize(number = n())
+summary_variance_c
+```
+
+## * statistical analysis
+```{r}
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="April"|month=="May"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="April"|month=="June"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="April"|month=="July"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="April"|month=="August"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="April"|month=="September"))
+
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="May"|month=="June"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="May"|month=="July"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="May"|month=="August"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="May"|month=="September"))
+
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="June"|month=="July"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="June"|month=="August"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="June"|month=="September"))
+
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="July"|month=="August"))
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="July"|month=="September"))
+
+var.test(mean_body_weight_of_secondary_queen_mg ~ month, variance_c %>% filter(month=="August"|month=="September"))
+```
+
+## * figure
+```{r}
+variance_c$month <- factor(variance_c$month, levels=c("April","May","June","July", "August", "September"))
+Fig_SQ_weight <- 
+ggplot(variance_c, aes(y = mean_body_weight_of_secondary_queen_mg, x = factor(month))) + 
+  geom_boxplot(outlier.shape = NA, 
+               width=0.6
+               ) + 
+  geom_jitter(#group = "group", 
+              color = "black", 
+              height = 0, 
+              width = 0.25, 
+              alpha = 0.4, 
+              size = 1 
+              ) +
+  scale_y_continuous(breaks=seq(0,50,by=5),limits=c(0,24),expand=c(0,0)) +
+  labs(y = "Mean body weght of secondary queen (mg)", 
+       x = "Month",
+       title ="") +
+  theme_classic()
+Fig_SQ_weight
+
+# save figure
+ggsave(file = "Figure SQ weight seasonality.pdf", plot = Fig_SQ_weight, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+
+# Correlation between body and ovary weight in secondary queen
+```{r}
+# loading data
+ovary <- read_excel("Dataset.xlsx", sheet="body and ovary weight") %>% 
+  as.data.frame(.)
+```
+
+## * sample size
+```{r}
+summary_ovary <- ovary %>% 
+  summarize(number = n())
+summary_ovary
+```
+
+## * statistical analysis
+```{r}
+model_og <- glm(ovaries_weight_mg ~ log(body_weight_of_secondary_queen_mg), family = Gamma(link = "log"), ovary)
+model_og2 <- glm(ovaries_weight_mg ~ 1, family = Gamma(link = "log"), ovary)
+summary(model_og)
+anova(model_og, model_og2, test="Chi")
+Anova(model_og)
+```
+
+## * figure
+```{r}
+Fig_ovary <- 
+  ggplot(ovary, aes(y = ovaries_weight_mg, x = body_weight_of_secondary_queen_mg)) +
+  stat_function(fun = function(x){exp(coef(model_og)[1] + coef(model_og)[2]*log(x))}) + 
+  geom_point(size = 3, shape = 1) +
+  labs(x = "SQ body weight (mg)",
+       y = "Ovary weight (mg)", 
+       title ="") +
+  scale_x_continuous(breaks=seq(0,50,by=5),limits=c(0,26)) +
+  scale_y_continuous(breaks=seq(0,20,by=5),limits=c(0,16)) +
+  theme_classic()
+Fig_ovary
+
+# save figure
+ggsave(file = "Figure ovary.pdf", plot = Fig_ovary, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- ovary %>% 
+  summarize(mean = mean(ovaries_weight_mg))
+mean <- summary_ymean$mean[1]
+
+ovary_prep <- ovary %>% 
+  mutate(pred = exp(coef(model_og)[1] + coef(model_og)[2]*log(body_weight_of_secondary_queen_mg))) %>% 
+  mutate(resid_square = (ovaries_weight_mg - pred)^2) %>% 
+  mutate(deviation_square = (ovaries_weight_mg - mean)^2)
+
+ovary_r2 <- ovary_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+ovary_r2
+```
+
+
+# Correlation between body weight of secondary queen and egg production
+```{r}
+# data loading
+egg <- read_excel("Dataset.xlsx", sheet="queen weight and egg production") %>% 
+  as.data.frame(.)
+```
+
+## * sample size
+```{r}
+summary_egg <- egg %>% 
+  group_by(colony) %>% 
+  summarize(mean = mean(no_of_eggs_laid)) %>% 
+  summarize(number = n())
+summary_egg
+```
+
+## * statistical analysis
+```{r}
+model_eg <- glm(no_of_eggs_laid ~ log(body_weight_of_secondary_queen_mg), family = poisson(link = "log"), egg)
+model_eg2 <- glm(no_of_eggs_laid ~ 1, family = poisson(link = "log"), egg)
+summary(model_eg)
+anova(model_eg, model_eg2, test="Chi")
+Anova(model_eg)
+```
+
+## * figure
+```{r}
+Fig_egg <- 
+  ggplot(egg, aes(y = no_of_eggs_laid, x = body_weight_of_secondary_queen_mg)) +
+  stat_function(fun = function(x){exp(coef(model_eg)[1] + coef(model_eg)[2]*log(x))}) +
+  geom_point(size = 3, shape = 1) +
+  labs(x = "Body weight of queen  (mg)",
+       y = "Number of eggs laid (per 24h)", 
+       title ="") +
+  scale_x_continuous(breaks=seq(-10,50,by=5),limits=c(0,26)) +
+  scale_y_continuous(breaks=seq(-40,300,by=20),limits=c(0,130)) +
+  theme_classic()
+Fig_egg
+
+# save figure
+ggsave(file = "Figure egg production.pdf", plot = Fig_egg, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- egg %>% 
+  summarize(mean = mean(no_of_eggs_laid))
+mean <- summary_ymean$mean[1]
+
+egg_prep <- egg %>% 
+  mutate(pred = exp(coef(model_eg)[1] + coef(model_eg)[2]*log(body_weight_of_secondary_queen_mg))) %>% 
+  mutate(resid_square = (no_of_eggs_laid - pred)^2) %>% 
+  mutate(deviation_square = (no_of_eggs_laid - mean)^2)
+
+egg_r2 <- egg_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+egg_r2
+```
+
+
+# Correlation between number of workers and daily egg production
+```{r}
+# data loading and calculation of number of eggs laid in the colony
+egg_estimate <- read_excel("Dataset.xlsx", sheet="colony size and egg production") %>% 
+  as.data.frame(.) %>% 
+  mutate(daily_egg_production = round((exp(coef(model_eg)[1] + coef(model_eg)[2]*log(mean_body_weight_of_secondary_queen_mg)))*no_of_secondary_queen, 0))
+```
+
+## * sample size
+```{r}
+summary_egg_estimate <- egg_estimate %>% 
+  summarize(number = n())
+summary_egg_estimate
+```
+
+## * statistical analysis
+```{r}
+model_w_egg <- glm(no_of_worker ~ log(daily_egg_production), family = poisson(link = "log"), egg_estimate)
+model_w_egg2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), egg_estimate)
+summary(model_w_egg)
+anova(model_w_egg, model_w_egg2, test="Chi")
+Anova(model_w_egg)
+```
+
+## * figure 
+```{r}
+Fig_egg_W <- 
+  ggplot(egg_estimate, aes(y = no_of_worker, x = daily_egg_production)) +
+  stat_function(fun = function(x){exp(coef(model_w_egg)[1] + coef(model_w_egg)[2]*log(x))}) +
+  geom_point(size = 3, shape = 1) +
+  labs(y = "Number of workers in the colony",
+       x = "Total number of eggs laid in the colony (per 24h)", 
+       title ="") +
+  scale_y_continuous(breaks=seq(0,450000,by=50000),limits=c(0,360000)) +
+  scale_x_continuous(breaks=seq(0,6000,by=1000),limits=c(0,4600)) +
+  theme_classic()
+Fig_egg_W
+
+# save figure
+ggsave(file = "Figure W egg.pdf", plot = Fig_egg_W, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- egg_estimate %>% 
+  summarize(mean = mean(no_of_worker))
+mean <- summary_ymean$mean[1]
+
+egg_estimate_prep <- egg_estimate %>% 
+  mutate(pred = exp(coef(model_w_egg)[1] + coef(model_w_egg)[2]*log(daily_egg_production))) %>% 
+  mutate(resid_square = (no_of_worker - pred)^2) %>% 
+  mutate(deviation_square = (no_of_worker - mean)^2)
+
+egg_estimate_r2 <- egg_estimate_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+egg_estimate_r2
+```
+
+
+# Correlation between number of workers and total queen weight
+```{r}
+# data loading and calculation of number of eggs laid in the colony
+q_estimate <- read_excel("Dataset.xlsx", sheet="colony size and egg production") %>% 
+  as.data.frame(.) %>% 
+  mutate(daily_egg_production = round((exp(coef(model_eg)[1] + coef(model_eg)[2]*log(mean_body_weight_of_secondary_queen_mg)))*no_of_secondary_queen, 0)) %>% 
+  mutate(total_queen_weight = mean_body_weight_of_secondary_queen_mg*no_of_secondary_queen)
+```
+
+## * sample size
+```{r}
+summary_q_estimate <- q_estimate %>% 
+  summarize(number = n())
+summary_q_estimate
+```
+
+## * statistical analysis
+```{r}
+model_w_q <- glm(no_of_worker ~ log(total_queen_weight), family = poisson(link = "log"), q_estimate)
+model_w_q2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), q_estimate)
+summary(model_w_q)
+anova(model_w_q, model_w_q2, test="Chi")
+Anova(model_w_q)
+```
+
+## * figure 
+```{r}
+Fig_Q_W <- 
+  ggplot(q_estimate, aes(y = no_of_worker, x = total_queen_weight)) +
+  stat_function(fun = function(x){exp(coef(model_w_q)[1] + coef(model_w_q)[2]*log(x))}) +
+  geom_point(size = 3, shape = 1) +
+  labs(y = "Number of workers in the colony",
+       x = "Total weight of queens (mg)", 
+       title ="") +
+  scale_y_continuous(breaks=seq(0,450000,by=50000),limits=c(0,360000)) +
+  scale_x_continuous(breaks=seq(0,6000,by=200),limits=c(0,1200)) +
+  theme_classic()
+Fig_Q_W
+
+# save figure
+ggsave(file = "Figure W Q.pdf", plot = Fig_Q_W, dpi = 300, width = 89, height = 89, units = c("mm"))
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- q_estimate %>% 
+  summarize(mean = mean(no_of_worker))
+mean <- summary_ymean$mean[1]
+
+q_estimate_prep <- q_estimate %>% 
+  mutate(pred = exp(coef(model_w_q)[1] + coef(model_w_q)[2]*log(total_queen_weight))) %>% 
+  mutate(resid_square = (no_of_worker - pred)^2) %>% 
+  mutate(deviation_square = (no_of_worker - mean)^2)
+
+q_estimate_r2 <- q_estimate_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+q_estimate_r2
+```
+
+
+# Colony size estimate in field colonies
+```{r}
+# data loading and estimation of number of workers in the colony
+worker_estimate <- read_excel("Dataset.xlsx", sheet="colony size estimation") %>% 
+  as.data.frame(.) %>% 
+  mutate(daily_egg_production = round((exp(coef(model_eg)[1] + coef(model_eg)[2]*log(mean_body_weight_of_secondary_queen_mg)))*no_of_secondary_queen, 0)) %>% 
+  mutate(W_estimate = round(exp(coef(model_w_egg)[1] + coef(model_w_egg)[2]*log(daily_egg_production)),0))
+```
+
+## * sample size
+```{r}
+summary_worker_estimate <- worker_estimate %>% 
+  summarize(number = n(),
+            first_quartile = quantile(W_estimate, 0.25, na.rm = TRUE), 
+            median = median(W_estimate),
+            third_quartile = quantile(W_estimate, 0.75, na.rm = TRUE), 
+            max = max(W_estimate))
+summary_worker_estimate
+```
+
+## * figure
+```{r}
+# colony size in the field
+hist <-
+ggplot(worker_estimate, aes(x = W_estimate)) +
+  geom_histogram(boundary = 1, 
+                 binwidth = 10000, 
+                 color="black"
+                 ) +
+  scale_x_continuous(breaks = seq(0, 1000000, by = 50000), limits=c(0,480000), expand = c(0,0)) +  
+  scale_y_continuous(breaks = seq(0, 100, by = 10), limits=c(0,48), expand = c(0,0)) + 
+  labs(x = "Number of workers in the colony",
+       y = "Number of colonies") +
+  theme_classic()
+hist
+```
+
+
+
+
