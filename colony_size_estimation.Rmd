@@ -29,7 +29,7 @@ library(car)
 ```{r}
 # data loading and processing
 mark <- read_excel("Dataset.xlsx", sheet="mark recapture") %>% 
-  mutate(total_W = no_of_unmarked_wroker + no_of_marked_workers_stayed_in_introduced_log + no_of_marked_workers_dispersed_from_another_log) %>% 
+  mutate(total_W = no_of_unmarked_wrokers + no_of_marked_workers_stayed_in_introduced_log + no_of_marked_workers_dispersed_from_another_log) %>% 
   as.data.frame(.)
 
 mark_r <- mark %>% 
@@ -68,7 +68,7 @@ mark_all <- rbind(introduced_in_royal, introduced_in_foraging)
 ```{r}
 summary_mark <- mark %>% 
   group_by(period_week,colony) %>% 
-  summarize(mean = mean(no_of_unmarked_wroker)) %>% 
+  summarize(mean = mean(no_of_unmarked_wrokers)) %>% 
   summarize(number = n())
 summary_mark
 ```
@@ -408,6 +408,7 @@ summary_egg_estimate
 model_w_egg <- glm(no_of_worker ~ log(daily_egg_production), family = poisson(link = "log"), egg_estimate)
 model_w_egg2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), egg_estimate)
 summary(model_w_egg)
+summary(model_w_egg2)
 anova(model_w_egg, model_w_egg2, test="Chi")
 Anova(model_w_egg)
 ```
@@ -449,6 +450,92 @@ egg_estimate_r2 <- egg_estimate_prep %>%
 egg_estimate_r2
 ```
 
+# Correlation between number of workers and king weight
+## * statistical analysis
+```{r}
+model_w_k <- glm(no_of_worker ~ log(body_weight_of_primary_king_mg), family = poisson(link = "log"), q_estimate)
+model_w_k2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), q_estimate)
+summary(model_w_k)
+anova(model_w_k, model_w_k2, test="Chi")
+Anova(model_w_k)
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- q_estimate %>% 
+  summarize(mean = mean(no_of_worker))
+mean <- summary_ymean$mean[1]
+
+q_estimate_prep <- q_estimate %>% 
+  mutate(pred = exp(coef(model_w_k)[1] + coef(model_w_k)[2]*log(body_weight_of_primary_king_mg))) %>% 
+  mutate(resid_square = (no_of_worker - pred)^2) %>% 
+  mutate(deviation_square = (no_of_worker - mean)^2)
+
+q_estimate_r2 <- q_estimate_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+q_estimate_r2
+```
+
+# Correlation between number of workers and queen mean weight
+## * statistical analysis
+```{r}
+model_w_mq <- glm(no_of_worker ~ log(mean_body_weight_of_secondary_queen_mg), family = poisson(link = "log"), q_estimate)
+model_w_mq2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), q_estimate)
+summary(model_w_mq)
+anova(model_w_mq, model_w_mq2, test="Chi")
+Anova(model_w_mq)
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- q_estimate %>% 
+  summarize(mean = mean(no_of_worker))
+mean <- summary_ymean$mean[1]
+
+q_estimate_prep <- q_estimate %>% 
+  mutate(pred = exp(coef(model_w_mq)[1] + coef(model_w_mq)[2]*log(mean_body_weight_of_secondary_queen_mg))) %>% 
+  mutate(resid_square = (no_of_worker - pred)^2) %>% 
+  mutate(deviation_square = (no_of_worker - mean)^2)
+
+q_estimate_r2 <- q_estimate_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+q_estimate_r2
+```
+
+# Correlation between number of workers and number of queens
+## * statistical analysis
+```{r}
+model_w_nq <- glm(no_of_worker ~ log(no_of_secondary_queen), family = poisson(link = "log"), q_estimate)
+model_w_nq2 <- glm(no_of_worker ~ 1, family = poisson(link = "log"), q_estimate)
+summary(model_w_nq)
+anova(model_w_nq, model_w_nq2, test="Chi")
+Anova(model_w_nq)
+```
+
+## * determinant coefficient (R^2)
+```{r}
+summary_ymean <- q_estimate %>% 
+  summarize(mean = mean(no_of_worker))
+mean <- summary_ymean$mean[1]
+
+q_estimate_prep <- q_estimate %>% 
+  mutate(pred = exp(coef(model_w_nq)[1] + coef(model_w_nq)[2]*log(no_of_secondary_queen))) %>% 
+  mutate(resid_square = (no_of_worker - pred)^2) %>% 
+  mutate(deviation_square = (no_of_worker - mean)^2)
+
+q_estimate_r2 <- q_estimate_prep %>% 
+  summarize(numerator = sum(resid_square),
+            denominator = sum(deviation_square)) %>% 
+  mutate(r2 = 1 - numerator/denominator)
+
+q_estimate_r2
+```
 
 # Correlation between number of workers and total queen weight
 ```{r}
@@ -512,7 +599,6 @@ q_estimate_r2 <- q_estimate_prep %>%
 q_estimate_r2
 ```
 
-
 # Colony size estimate in field colonies
 ```{r}
 # data loading and estimation of number of workers in the colony
@@ -549,7 +635,3 @@ ggplot(worker_estimate, aes(x = W_estimate)) +
   theme_classic()
 hist
 ```
-
-
-
-
