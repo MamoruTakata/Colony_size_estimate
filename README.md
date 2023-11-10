@@ -6,3 +6,6 @@ This is the "R code" repository used for graphing and statistical analyses used 
 
 The file "colony_size_estimation.Rmd" contains the R code.
 The file "Dataset.xlsx" contains the source data.
+
+See the paper for details of the methods.
+https://doi.org/10.1007/s00114-023-01865-6
